@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCM Visit Checker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #0d9488;
+    --primary-dark: #0f766e;
+    --primary-light: #ccfbf1;
+    --primary-bg: #f0fdfa;
+    --surface: #ffffff;
+    --bg: #f8fafc;
+    --text: #0f172a;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+    --border: #e2e8f0;
+    --border-light: #f1f5f9;
+    --danger: #ef4444;
+    --danger-bg: #fef2f2;
+    --success: #10b981;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+    --shadow-lg: 0 8px 30px rgba(0,0,0,0.08);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', 'Hind Siliguri', 'Segoe UI', 'Noto Sans Bengali', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; overflow-x: hidden; }
+  html { -webkit-text-size-adjust: 100%; }
+
+  /* ── Login Overlay ── */
+  .login-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: linear-gradient(135deg, #0d9488 0%, #0891b2 50%, #0e7490 100%);
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 32px; padding: 24px;
+  }
+  .login-overlay.hidden { display: none; }
+  .login-card {
+    background: rgba(255,255,255,0.12);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 24px; padding: 48px 36px;
+    text-align: center; max-width: 380px; width: 100%;
+  }
+  .login-icon {
+    width: 64px; height: 64px; margin: 0 auto 20px;
+    background: rgba(255,255,255,0.2); border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+  }
+  .login-logo { font-size: 24px; font-weight: 800; color: white; letter-spacing: -0.3px; }
+  .login-logo-sub { font-size: 13px; color: rgba(255,255,255,0.75); margin-top: 6px; line-height: 1.4; font-family: 'Hind Siliguri', 'Noto Sans Bengali', sans-serif; }
+  .btn-google {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    background: white; border: none;
+    padding: 14px 32px; border-radius: 14px;
+    font-size: 15px; font-weight: 700; color: var(--text);
+    cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+    width: 100%; max-width: 300px;
+    font-family: inherit;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  }
+  .btn-google:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,0,0,0.2); }
+  .btn-google:active { transform: translateY(0); }
+  .btn-google svg { width: 22px; height: 22px; flex-shrink: 0; }
+  .login-loading { font-size: 13px; color: rgba(255,255,255,0.8); }
+  .login-footer { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 8px; }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%);
+    color: white;
+    padding: 16px 20px;
+    padding-top: calc(16px + env(safe-area-inset-top, 0px));
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    box-shadow: 0 2px 12px rgba(13,148,136,0.25);
+  }
+  .header-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .header-title { font-size: 16px; font-weight: 800; letter-spacing: -0.2px; }
+  .header-sub { font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 500; font-family: 'Hind Siliguri', 'Noto Sans Bengali', sans-serif; }
+  .header-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .btn-header {
+    background: rgba(255,255,255,0.2); color: white; border: none;
+    padding: 8px 14px; border-radius: 10px;
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    white-space: nowrap; font-family: inherit;
+    backdrop-filter: blur(8px); transition: background 0.15s;
+  }
+  .btn-header:hover { background: rgba(255,255,255,0.3); }
+  .btn-header.solid { background: white; color: var(--primary-dark); }
+  .btn-header.solid:hover { background: #f0fdfa; }
+  .user-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.5); object-fit: cover;
+  }
+
+  /* ── Visit Panel ── */
+  .visit-panel {
+    background: var(--surface);
+    margin: 16px 20px 0;
+    padding: 20px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-light);
+  }
+  .visit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .visit-field label {
+    display: block; font-size: 11px; font-weight: 600;
+    color: var(--text-secondary); margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .visit-field input {
+    width: 100%; padding: 10px 14px;
+    border: 2px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 13px; color: var(--text); background: var(--bg);
+    font-family: inherit; font-weight: 500;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .visit-field input:focus {
+    outline: none; border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(13,148,136,0.12);
+    background: white;
+  }
+
+  /* ── Custom Dropdown ── */
+  .custom-select {
+    position: relative; width: 100%;
+  }
+  .custom-select-trigger {
+    width: 100%; padding: 10px 36px 10px 14px;
+    border: 2px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 13px; color: var(--text); background: var(--bg);
+    font-family: inherit; font-weight: 500; cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    text-align: left; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+  }
+  .custom-select-trigger.placeholder { color: var(--text-muted); }
+  .custom-select-trigger:focus,
+  .custom-select.open .custom-select-trigger {
+    outline: none; border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(13,148,136,0.12);
+    background-color: white;
+  }
+  .custom-select-options {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--surface); border: 2px solid var(--border);
+    border-radius: var(--radius-sm); box-shadow: var(--shadow-lg);
+    z-index: 60; max-height: 220px; overflow-y: auto;
+    display: none;
+  }
+  .custom-select.open .custom-select-options { display: block; }
+  .custom-select-option {
+    padding: 10px 14px; font-size: 13px; font-weight: 500;
+    color: var(--text); cursor: pointer;
+    font-family: inherit;
+    transition: background 0.1s;
+  }
+  .custom-select-option:hover { background: var(--primary-bg); }
+  .custom-select-option.selected { background: var(--primary-light); color: var(--primary-dark); font-weight: 600; }
+
+  /* ── Progress Bar ── */
+  .progress-bar-wrap {
+    margin: 12px 20px 0; padding: 14px 20px;
+    background: var(--surface); border-radius: var(--radius);
+    box-shadow: var(--shadow-sm); border: 1px solid var(--border-light);
+    display: flex; align-items: center; gap: 14px;
+  }
+  .prog-track { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .prog-fill {
+    height: 100%; border-radius: 4px; transition: width 0.4s ease;
+    background: linear-gradient(90deg, #0d9488, #06b6d4);
+    width: 0%;
+  }
+  .prog-label {
+    font-size: 12px; font-weight: 700; color: var(--primary);
+    min-width: 82px; text-align: right;
+  }
+
+  /* ── Sections ── */
+  .sections { padding: 8px 20px 88px; display: flex; flex-direction: column; gap: 2px; }
+  .section-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1.2px; color: var(--primary);
+    padding: 20px 0 8px;
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Inter', 'Hind Siliguri', sans-serif;
+  }
+  .section-label::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+  .check-item {
+    background: var(--surface); border: 2px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px; margin-bottom: 6px;
+    display: flex; gap: 14px; align-items: flex-start;
+    cursor: pointer; transition: all 0.2s ease;
+    position: relative;
+  }
+  .check-item:hover { border-color: #cbd5e1; box-shadow: var(--shadow-sm); }
+  .check-item.done {
+    border-color: var(--primary); background: var(--primary-bg);
+    box-shadow: 0 0 0 1px var(--primary), var(--shadow-sm);
+  }
+  .checkbox {
+    width: 22px; height: 22px; border: 2px solid #cbd5e1;
+    border-radius: 6px; flex-shrink: 0; margin-top: 1px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease;
+  }
+  .check-item.done .checkbox {
+    background: var(--primary); border-color: var(--primary);
+    box-shadow: 0 2px 6px rgba(13,148,136,0.3);
+  }
+  .checkmark { display: none; color: white; font-size: 13px; font-weight: 700; line-height: 1; }
+  .check-item.done .checkmark { display: block; }
+  .item-body { flex: 1; min-width: 0; }
+  .item-name { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.3; }
+  .check-item.done .item-name { color: var(--primary-dark); }
+  .item-bn { font-size: 11px; color: var(--text-muted); margin-top: 3px; font-family: 'Hind Siliguri', 'Noto Sans Bengali', 'Segoe UI', sans-serif; }
+  .remark-input {
+    width: 100%; margin-top: 10px; padding: 8px 12px;
+    border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 12px; color: var(--text); background: white;
+    resize: none; height: 36px; font-family: inherit;
+    transition: height 0.2s, border-color 0.2s; display: none;
+  }
+  .remark-input:focus {
+    outline: none; border-color: var(--primary); height: 56px;
+    box-shadow: 0 0 0 3px rgba(13,148,136,0.08);
+  }
+  .check-item.done .remark-input { display: block; }
+
+  /* ── Bottom Bar ── */
+  .bottom-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border-light);
+    padding: 12px 20px; display: flex; align-items: center; gap: 8px;
+    z-index: 40;
+  }
+  .bottom-count { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+  .bottom-count span { font-weight: 800; color: var(--primary); }
+  .btn-reset {
+    background: var(--bg); border: 1.5px solid var(--border);
+    padding: 9px 16px; border-radius: 10px; font-size: 12px;
+    color: var(--text-secondary); cursor: pointer; font-family: inherit; font-weight: 600;
+    transition: all 0.15s;
+  }
+  .btn-reset:hover { border-color: #cbd5e1; background: white; }
+  .btn-save {
+    background: linear-gradient(135deg, #0d9488, #0891b2); color: white; border: none;
+    padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 700;
+    cursor: pointer; margin-left: auto; font-family: inherit;
+    box-shadow: 0 2px 8px rgba(13,148,136,0.3);
+    transition: all 0.15s;
+  }
+  .btn-save:hover { box-shadow: 0 4px 16px rgba(13,148,136,0.4); transform: translateY(-1px); }
+  .btn-save:active { transform: translateY(0); }
+  .btn-save:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-export {
+    background: var(--text); color: white; border: none;
+    padding: 10px 18px; border-radius: 10px; font-size: 12px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: all 0.15s;
+  }
+  .btn-export:hover { background: #1e293b; }
+
+  /* ── Records Modal ── */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(15,23,42,0.5);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .modal-backdrop.hidden { display: none; }
+  .modal-sheet {
+    background: var(--bg); width: 100%; max-width: 500px;
+    max-height: 80vh; border-radius: 20px 20px 0 0;
+    display: flex; flex-direction: column;
+    animation: slideUp 0.3s cubic-bezier(0.16,1,0.3,1);
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-handle {
+    width: 36px; height: 4px; background: var(--border);
+    border-radius: 2px; margin: 10px auto 0;
+  }
+  .modal-header {
+    padding: 16px 24px 14px; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border); background: var(--surface);
+  }
+  .modal-title { font-size: 17px; font-weight: 800; letter-spacing: -0.2px; }
+  .modal-close {
+    background: var(--bg); border: none; font-size: 18px; color: var(--text-secondary);
+    cursor: pointer; width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .modal-close:hover { background: var(--border); }
+  .modal-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+  .record-card {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 10px;
+    transition: all 0.2s;
+  }
+  .record-card:hover { border-color: #cbd5e1; box-shadow: var(--shadow-sm); }
+  .record-card.active { border-color: var(--primary); background: var(--primary-bg); }
+  .record-plaza { font-size: 14px; font-weight: 700; color: var(--text); }
+  .record-meta {
+    font-size: 12px; color: var(--text-secondary); margin-top: 6px;
+    display: flex; gap: 16px; font-weight: 500;
+  }
+  .record-meta .badge {
+    background: var(--primary-light); color: var(--primary-dark);
+    padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;
+  }
+  .record-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .record-actions button {
+    padding: 7px 16px; border-radius: 8px; font-size: 12px;
+    font-weight: 600; cursor: pointer; border: none; font-family: inherit;
+    transition: all 0.15s;
+  }
+  .btn-load { background: var(--primary); color: white; }
+  .btn-load:hover { background: var(--primary-dark); }
+  .btn-del { background: var(--danger-bg); color: var(--danger); }
+  .btn-del:hover { background: #fee2e2; }
+  .records-empty {
+    text-align: center; padding: 48px 24px; color: var(--text-muted);
+    font-size: 13px; line-height: 1.6;
+  }
+  .records-empty-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.4; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: white; padding: 12px 24px;
+    border-radius: 12px; font-size: 13px; font-weight: 600; z-index: 150;
+    animation: fadeInOut 2.5s ease forwards;
+    pointer-events: none; white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    font-family: inherit;
+  }
+  @keyframes fadeInOut {
+    0% { opacity: 0; transform: translateX(-50%) translateY(12px); }
+    12% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* ── Mobile Responsive ── */
+  @media (max-width: 600px) {
+    .header { padding: 14px 16px; }
+    .header-title { font-size: 15px; }
+    .header-sub { font-size: 10px; }
+    .btn-header { padding: 7px 10px; font-size: 10px; border-radius: 8px; }
+    .user-avatar { width: 28px; height: 28px; }
+    .visit-panel { margin: 12px 14px 0; padding: 16px; }
+    .visit-grid { grid-template-columns: 1fr; gap: 10px; }
+    .visit-field label { font-size: 11px; }
+    .visit-field input { padding: 12px 14px; font-size: 16px; }
+    .custom-select-trigger { padding: 12px 40px 12px 14px; font-size: 16px; }
+    .custom-select-option { padding: 12px 14px; font-size: 16px; }
+    .progress-bar-wrap { margin: 10px 14px 0; padding: 12px 16px; }
+    .prog-label { font-size: 12px; min-width: 76px; }
+    .sections { padding: 4px 14px 92px; }
+    .section-label { font-size: 10px; padding: 16px 0 6px; }
+    .check-item { padding: 14px; gap: 12px; margin-bottom: 8px; }
+    .checkbox { width: 26px; height: 26px; border-radius: 7px; }
+    .checkmark { font-size: 14px; }
+    .item-name { font-size: 14px; line-height: 1.35; }
+    .item-bn { font-size: 12px; margin-top: 3px; font-family: 'Hind Siliguri', 'Noto Sans Bengali', 'Segoe UI', sans-serif; }
+    .remark-input { font-size: 16px; padding: 10px 12px; height: 40px; }
+    .remark-input:focus { height: 64px; }
+    .bottom-bar {
+      padding: 10px 14px; flex-wrap: wrap; justify-content: center;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      gap: 8px;
+    }
+    .bottom-count { width: 100%; text-align: center; font-size: 12px; order: -1; }
+    .btn-reset { order: 1; }
+    .btn-save { order: 2; margin-left: 0; flex: 1; }
+    .btn-export { order: 3; }
+    .modal-sheet { max-height: 88vh; border-radius: 20px 20px 0 0; }
+    .login-card { padding: 36px 24px; margin: 0 8px; }
+    .login-logo { font-size: 20px; }
+  }
+  @media (max-width: 360px) {
+    .header-title { font-size: 13px; }
+    .header-right { gap: 4px; }
+    .btn-header { padding: 6px 8px; font-size: 9px; }
+  }
+  @media print {
+    .header { background: #0d9488 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .bottom-bar, .modal-backdrop, .login-overlay { display: none; }
+    .visit-panel { box-shadow: none; border: 1px solid #ddd; }
+    .sections { padding-bottom: 0; }
+    .check-item { box-shadow: none !important; }
+    .remark-input { display: block !important; border: none; background: none; box-shadow: none !important; }
+    .progress-bar-wrap { display: none; }
+    body { background: white; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Login Overlay ── -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-card">
+    <div class="login-icon">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    </div>
+    <div class="login-logo">RCM Visit Checker</div>
+    <div class="login-logo-sub">আঞ্চলিক ক্রেডিট ম্যানেজার পরিদর্শন চেকলিস্ট</div>
+  </div>
+  <button class="btn-google" id="btn-google-login" onclick="signInWithGoogle()">
+    <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+    Sign in with Google
+  </button>
+  <div class="login-loading" id="login-loading" style="display:none">Signing in...</div>
+  <div class="login-footer">Walton RCM Dashboard</div>
+</div>
+
+<!-- ── Main App ── -->
+<div id="main-app" style="display:none">
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-title">RCM Visit Checker</div>
+    <div class="header-sub">Walton — আঞ্চলিক ক্রেডিট ম্যানেজার চেকলিস্ট</div>
+  </div>
+  <div class="header-right">
+    <button class="btn-header" onclick="openRecords()">Records</button>
+    <button class="btn-header solid" onclick="window.print()">Print</button>
+    <img class="user-avatar" id="user-avatar" src="" alt="" style="display:none">
+    <button class="btn-header" onclick="signOutUser()">Logout</button>
+  </div>
+</div>
+
+<div class="visit-panel">
+  <div class="visit-grid">
+    <div class="visit-field">
+      <label>Visit Date</label>
+      <input type="date" id="visit-date">
+    </div>
+    <div class="visit-field">
+      <label>Plaza Name</label>
+      <div class="custom-select" id="plaza-select">
+        <input type="hidden" id="plaza-name" value="">
+        <button type="button" class="custom-select-trigger placeholder" id="plaza-trigger">Select Plaza</button>
+        <div class="custom-select-options" id="plaza-options"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="progress-bar-wrap">
+  <div class="prog-track"><div class="prog-fill" id="prog-fill"></div></div>
+  <div class="prog-label" id="prog-label">0 of 21 done</div>
+</div>
+
+<div class="sections" id="sections"></div>
+
+<div class="bottom-bar">
+  <div class="bottom-count"><span id="done-count">0</span> / 21 checked</div>
+  <button class="btn-reset" onclick="resetAll()">Reset</button>
+  <button class="btn-save" id="btn-save" onclick="saveChecklist()">Save</button>
+  <button class="btn-export" onclick="window.print()">Export PDF</button>
+</div>
+
+</div>
+
+<!-- ── Records Modal ── -->
+<div class="modal-backdrop hidden" id="records-modal" onclick="closeRecordsBackdrop(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">My Records</div>
+      <button class="modal-close" onclick="closeRecords()">&times;</button>
+    </div>
+    <div class="modal-body" id="records-list">
+      <div class="records-empty">Loading...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Firebase SDK ── -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAnXg4I86wydR4T5ngivHZ_FnOZd-E_5UI",
+  authDomain: "hiresummary.firebaseapp.com",
+  projectId: "hiresummary",
+  storageBucket: "hiresummary.firebasestorage.app",
+  messagingSenderId: "13522888863",
+  appId: "1:13522888863:web:15f64663a848a1bc419aaa"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+const ITEMS = [
+  { section: "General Operations / সাধারণ অপারেশন", items: [
+    { name: "Cash Management", bn: "নগদ ব্যবস্থাপনা" },
+    { name: "Showroom & Godown Organize", bn: "শোরুম ও গুদাম সংগঠন" },
+    { name: "Bill Voucher", bn: "বিল ভাউচার" },
+    { name: "Daily Target vs Achievement", bn: "দৈনিক লক্ষ্য বনাম অর্জন" },
+    { name: "Manager & Deputy Manager Visit", bn: "ম্যানেজার ও ডেপুটি ম্যানেজার ভিজিট" },
+    { name: "Offer, Policy & Product Knowledge", bn: "অফার, নীতি ও পণ্য জ্ঞান" },
+    { name: "Daily Phone Call", bn: "দৈনিক ফোন কল" },
+    { name: "Old Product Check", bn: "পুরানো পণ্য পরীক্ষা" },
+    { name: "Dealer & Corporate Balance Confirmation", bn: "ডিলার ও কর্পোরেট ব্যালেন্স নিশ্চিতকরণ" },
+    { name: "0%-5% Dealer", bn: "০%-৫% ডিলার" },
+    { name: "Corporate No Collection", bn: "কর্পোরেট কোনো কালেকশন নেই" },
+  ]},
+  { section: "Hire / কিস্তি সংক্রান্ত", items: [
+    { name: "Hire Form", bn: "হায়ার ফর্ম" },
+    { name: "Hire Cheque — RCM/RSM Approval", bn: "হায়ার চেক অনুমোদন" },
+    { name: "Bhanga Kisti", bn: "ভাঙ্গা কিস্তি" },
+    { name: "3 Month No Collection", bn: "৩ মাস কোনো কালেকশন নেই" },
+    { name: "Highest OD", bn: "সর্বোচ্চ ওভারডিউ" },
+    { name: "Jorip", bn: "জরিপ" },
+    { name: "Surokkha Card", bn: "সুরক্ষা কার্ড" },
+    { name: "Card Assign Check", bn: "কার্ড অ্যাসাইন চেক" },
+    { name: "Walock", bn: "ওয়ালক ডিভাইস" },
+    { name: "Revert Product Check", bn: "রিভার্ট পণ্য পরীক্ষা" },
+  ]},
+];
+
+let total = 0, checked = {}, currentUser = null, editingDocId = null;
+
+auth.onAuthStateChanged(user => {
+  if (user) {
+    currentUser = user;
+    document.getElementById("login-overlay").classList.add("hidden");
+    document.getElementById("main-app").style.display = "";
+    const av = document.getElementById("user-avatar");
+    if (user.photoURL) { av.src = user.photoURL; av.style.display = ""; }
+    initApp();
+  } else {
+    currentUser = null;
+    document.getElementById("login-overlay").classList.remove("hidden");
+    document.getElementById("main-app").style.display = "none";
+  }
+});
+
+function signInWithGoogle() {
+  const btn = document.getElementById("btn-google-login");
+  const loading = document.getElementById("login-loading");
+  btn.style.display = "none"; loading.style.display = "";
+  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => {
+    console.error("Sign-in error:", err);
+    btn.style.display = ""; loading.style.display = "none";
+    showToast("Sign-in failed: " + err.message);
+  });
+}
+
+function signOutUser() { if (confirm("Sign out?")) auth.signOut(); }
+
+const PLAZAS = [
+  "Walton Plaza-Adalot Road, Tangail",
+  "Walton Plaza-Bashtoil, Mirzapur",
+  "Walton Plaza-Bhuapur, Tangail",
+  "Walton Plaza-Daulatpur, Manikgonj",
+  "Walton Plaza-Delduar, Tangail",
+  "Walton Plaza-Ghatail",
+  "Walton Plaza-Kalihati",
+  "Walton Plaza-Karatia",
+  "Walton Plaza-Mirzapur",
+  "Walton Plaza-Mymensingh Road, Tangail",
+  "Walton Plaza-Nagarpur",
+  "Walton Plaza-Pakullah, Tangail",
+  "Walton Plaza-Pakutia, Ghatail",
+  "Walton Plaza-Sagardighi, Tangail",
+  "Walton Plaza-Sakhipur",
+  "Walton Plaza-Sohagpur, Mirzapur",
+  "Walton Plaza-Zilla Sadar Road, Tangail"
+];
+
+function initApp() {
+  document.getElementById("visit-date").value = new Date().toISOString().split("T")[0];
+  initPlazaDropdown();
+  build();
+}
+
+function initPlazaDropdown() {
+  const container = document.getElementById("plaza-select");
+  const trigger = document.getElementById("plaza-trigger");
+  const optionsEl = document.getElementById("plaza-options");
+  const hiddenInput = document.getElementById("plaza-name");
+
+  // Build options
+  optionsEl.innerHTML = "";
+  PLAZAS.forEach(name => {
+    const opt = document.createElement("div");
+    opt.className = "custom-select-option";
+    opt.textContent = name;
+    opt.addEventListener("click", () => {
+      hiddenInput.value = name;
+      trigger.textContent = name;
+      trigger.classList.remove("placeholder");
+      optionsEl.querySelectorAll(".custom-select-option").forEach(o => o.classList.remove("selected"));
+      opt.classList.add("selected");
+      container.classList.remove("open");
+    });
+    optionsEl.appendChild(opt);
+  });
+
+  // Toggle open/close
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // Close any other open dropdowns
+    document.querySelectorAll(".custom-select.open").forEach(el => { if (el !== container) el.classList.remove("open"); });
+    container.classList.toggle("open");
+  });
+
+  // Close on outside click
+  document.addEventListener("click", (e) => {
+    if (!container.contains(e.target)) container.classList.remove("open");
+  });
+}
+
+function build() {
+  const container = document.getElementById("sections");
+  container.innerHTML = "";
+  let idx = 0;
+  ITEMS.forEach(group => {
+    const lbl = document.createElement("div");
+    lbl.className = "section-label";
+    lbl.textContent = group.section;
+    container.appendChild(lbl);
+    group.items.forEach(item => {
+      const id = "item-" + idx;
+      checked[id] = false; total++;
+      const div = document.createElement("div");
+      div.className = "check-item"; div.id = id;
+      div.innerHTML = `
+        <div class="checkbox"><span class="checkmark">✓</span></div>
+        <div class="item-body">
+          <div class="item-name">${item.name}</div>
+          <div class="item-bn">${item.bn}</div>
+          <textarea class="remark-input" placeholder="Remark / মন্তব্য..." onclick="event.stopPropagation()"></textarea>
+        </div>`;
+      div.addEventListener("click", function(e) {
+        if (e.target.tagName === "TEXTAREA") return;
+        toggle(id, div);
+      });
+      container.appendChild(div); idx++;
+    });
+  });
+  updateTotal();
+  document.getElementById("prog-label").textContent = `0 of ${total} done`;
+}
+
+function toggle(id, el) {
+  checked[id] = !checked[id];
+  el.classList.toggle("done", checked[id]);
+  updateTotal();
+}
+
+function updateTotal() {
+  const done = Object.values(checked).filter(Boolean).length;
+  document.getElementById("done-count").textContent = done;
+  document.getElementById("prog-fill").style.width = (done / total * 100) + "%";
+  document.getElementById("prog-label").textContent = `${done} of ${total} done`;
+}
+
+function resetAll() {
+  if (!confirm("Reset all?")) return;
+  document.querySelectorAll(".check-item").forEach(el => {
+    el.classList.remove("done");
+    el.querySelector("textarea").value = "";
+  });
+  Object.keys(checked).forEach(k => checked[k] = false);
+  editingDocId = null;
+  // Reset plaza dropdown
+  document.getElementById("plaza-name").value = "";
+  const trigger = document.getElementById("plaza-trigger");
+  trigger.textContent = "Select Plaza";
+  trigger.classList.add("placeholder");
+  document.querySelectorAll("#plaza-options .custom-select-option").forEach(o => o.classList.remove("selected"));
+  updateTotal();
+  document.getElementById("btn-save").textContent = "Save";
+}
+
+function collectData() {
+  const items = []; let idx = 0;
+  ITEMS.forEach(group => {
+    group.items.forEach(item => {
+      const el = document.getElementById("item-" + idx);
+      items.push({ name: item.name, bn: item.bn, checked: !!checked["item-" + idx], remark: el.querySelector("textarea").value });
+      idx++;
+    });
+  });
+  return {
+    userId: currentUser.uid, userName: currentUser.displayName || "",
+    visitDate: document.getElementById("visit-date").value,
+    plazaName: document.getElementById("plaza-name").value,
+    items, totalItems: total, completedItems: Object.values(checked).filter(Boolean).length,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+}
+
+async function saveChecklist() {
+  if (!currentUser) return;
+  const plaza = document.getElementById("plaza-name").value;
+  const date = document.getElementById("visit-date").value;
+  if (!plaza) { showToast("Please select a plaza"); return; }
+  if (!date) { showToast("Please select a date"); return; }
+  const btn = document.getElementById("btn-save");
+  btn.disabled = true; btn.textContent = "Saving...";
+  try {
+    const data = collectData();
+    if (editingDocId) {
+      await db.collection("checklists").doc(editingDocId).update(data);
+      showToast("Updated successfully!");
+    } else {
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      const ref = await db.collection("checklists").add(data);
+      editingDocId = ref.id;
+      showToast("Saved successfully!");
+    }
+    btn.textContent = "Update";
+  } catch (err) {
+    console.error("Save error:", err);
+    showToast("Save failed: " + err.message);
+    btn.textContent = editingDocId ? "Update" : "Save";
+  }
+  btn.disabled = false;
+}
+
+async function openRecords() {
+  document.getElementById("records-modal").classList.remove("hidden");
+  const list = document.getElementById("records-list");
+  list.innerHTML = '<div class="records-empty">Loading...</div>';
+  try {
+    const snap = await db.collection("checklists").where("userId", "==", currentUser.uid).orderBy("updatedAt", "desc").limit(50).get();
+    if (snap.empty) {
+      list.innerHTML = '<div class="records-empty"><div class="records-empty-icon">📋</div>No saved records yet.<br>Fill out the checklist and tap Save.</div>';
+      return;
+    }
+    list.innerHTML = "";
+    snap.forEach(doc => {
+      const d = doc.data();
+      const card = document.createElement("div");
+      card.className = "record-card" + (doc.id === editingDocId ? " active" : "");
+      card.innerHTML = `
+        <div class="record-plaza">${d.plazaName || "No plaza"}</div>
+        <div class="record-meta">
+          <span>${d.visitDate || "No date"}</span>
+          <span class="badge">${d.completedItems || 0}/${d.totalItems || 21}</span>
+        </div>
+        <div class="record-actions">
+          <button class="btn-load" data-id="${doc.id}">Load</button>
+          <button class="btn-del" data-id="${doc.id}">Delete</button>
+        </div>`;
+      card.querySelector(".btn-load").onclick = e => { e.stopPropagation(); loadRecord(doc.id, d); };
+      card.querySelector(".btn-del").onclick = e => { e.stopPropagation(); deleteRecord(doc.id, card); };
+      list.appendChild(card);
+    });
+  } catch (err) {
+    console.error("Load records error:", err);
+    list.innerHTML = '<div class="records-empty">Failed to load records.</div>';
+  }
+}
+
+function loadRecord(docId, data) {
+  editingDocId = docId;
+  document.getElementById("visit-date").value = data.visitDate || "";
+  const plazaVal = data.plazaName || "";
+  document.getElementById("plaza-name").value = plazaVal;
+  const trigger = document.getElementById("plaza-trigger");
+  trigger.textContent = plazaVal || "Select Plaza";
+  trigger.classList.toggle("placeholder", !plazaVal);
+  // Highlight selected option
+  document.querySelectorAll("#plaza-options .custom-select-option").forEach(opt => {
+    opt.classList.toggle("selected", opt.textContent === plazaVal);
+  });
+  document.querySelectorAll(".check-item").forEach(el => { el.classList.remove("done"); el.querySelector("textarea").value = ""; });
+  Object.keys(checked).forEach(k => checked[k] = false);
+  if (data.items) {
+    data.items.forEach((s, idx) => {
+      const id = "item-" + idx;
+      if (s.checked) { checked[id] = true; const el = document.getElementById(id); if (el) { el.classList.add("done"); el.querySelector("textarea").value = s.remark || ""; } }
+    });
+  }
+  updateTotal();
+  document.getElementById("btn-save").textContent = "Update";
+  closeRecords(); showToast("Record loaded");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function deleteRecord(docId, cardEl) {
+  if (!confirm("Delete this record?")) return;
+  try {
+    await db.collection("checklists").doc(docId).delete();
+    cardEl.remove();
+    if (editingDocId === docId) { editingDocId = null; document.getElementById("btn-save").textContent = "Save"; }
+    showToast("Record deleted");
+    if (!document.getElementById("records-list").children.length)
+      document.getElementById("records-list").innerHTML = '<div class="records-empty"><div class="records-empty-icon">📋</div>No saved records yet.</div>';
+  } catch (err) { console.error("Delete error:", err); showToast("Delete failed"); }
+}
+
+function closeRecords() { document.getElementById("records-modal").classList.add("hidden"); }
+function closeRecordsBackdrop(e) { if (e.target === e.currentTarget) closeRecords(); }
+
+function showToast(msg) {
+  const existing = document.querySelector(".toast");
+  if (existing) existing.remove();
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2600);
+}
+</script>
+</body>
+</html>
