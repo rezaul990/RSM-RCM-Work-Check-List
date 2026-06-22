@@ -567,7 +567,7 @@ const ITEMS = [
 ];
 
 let total = 0, checked = {}, editingDocId = null, saveTimer = null;
-let isSaving = false, activeUnsubscribe = null, currentDocKey = null;
+let isSaving = false, isLoadingDoc = false, activeUnsubscribe = null, currentDocKey = null;
 
 // ── Password Login ──
 function checkSession() {
@@ -764,10 +764,48 @@ function unsubscribeListener() {
 function subscribeToDocument(docId) {
   unsubscribeListener();
   if (!docId) return;
+  isLoadingDoc = true;
   const status = document.getElementById("auto-save-status");
-  status.textContent = "Live sync";
-  status.className = "auto-save-status live";
+  status.textContent = "Loading...";
+  status.className = "auto-save-status saving";
   activeUnsubscribe = db.collection("checklists").doc(docId).onSnapshot(doc => {
+    if (isLoadingDoc) {
+      // First snapshot — always load even if isSaving
+      isLoadingDoc = false;
+      if (doc.exists) {
+        const data = doc.data();
+        if (data.items) {
+          data.items.forEach((item, idx) => {
+            const id = "item-" + idx;
+            checked[id] = !!item.checked;
+            const el = document.getElementById(id);
+            if (el) {
+              el.classList.toggle("done", checked[id]);
+              el.querySelector("textarea").value = item.remark || "";
+            }
+          });
+          updateTotal();
+        }
+        if (data.visitDate) document.getElementById("visit-date").value = data.visitDate;
+        if (data.plazaName) {
+          const plazaVal = data.plazaName;
+          document.getElementById("plaza-name").value = plazaVal;
+          const trigger = document.getElementById("plaza-trigger");
+          trigger.textContent = plazaVal;
+          trigger.classList.remove("placeholder");
+          document.querySelectorAll("#plaza-options .custom-select-option").forEach(opt => {
+            opt.classList.toggle("selected", opt.textContent === plazaVal);
+          });
+        }
+        status.textContent = "Live sync";
+        status.className = "auto-save-status live";
+      } else {
+        status.textContent = "Ready";
+        status.className = "auto-save-status";
+      }
+      return;
+    }
+    // Subsequent snapshots — skip if local save in progress
     if (isSaving || !doc.exists) return;
     const data = doc.data();
     if (data.items) {
@@ -782,18 +820,8 @@ function subscribeToDocument(docId) {
       });
       updateTotal();
     }
-    // Sync plaza and date fields (read-only from remote)
-    if (data.visitDate) document.getElementById("visit-date").value = data.visitDate;
-    if (data.plazaName) {
-      const plazaVal = data.plazaName;
-      document.getElementById("plaza-name").value = plazaVal;
-      const trigger = document.getElementById("plaza-trigger");
-      trigger.textContent = plazaVal;
-      trigger.classList.remove("placeholder");
-      document.querySelectorAll("#plaza-options .custom-select-option").forEach(opt => {
-        opt.classList.toggle("selected", opt.textContent === plazaVal);
-      });
-    }
+    status.textContent = "Live sync";
+    status.className = "auto-save-status live";
   });
 }
 
