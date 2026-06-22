@@ -568,6 +568,15 @@ const ITEMS = [
 
 let total = 0, checked = {}, editingDocId = null, saveTimer = null;
 let isSaving = false, isLoadingDoc = false, activeUnsubscribe = null, currentDocKey = null;
+let hasUnsavedChanges = false;
+
+// Warn user if they try to leave with unsaved changes
+window.addEventListener("beforeunload", function(e) {
+  if (hasUnsavedChanges) {
+    e.preventDefault();
+    e.returnValue = "";
+  }
+});
 
 // ── Password Login ──
 function checkSession() {
@@ -625,7 +634,7 @@ checkSession();
 
 function initApp() {
   document.getElementById("visit-date").value = new Date().toISOString().split("T")[0];
-  document.getElementById("visit-date").addEventListener("change", () => autoSave());
+  document.getElementById("visit-date").addEventListener("change", () => { hasUnsavedChanges = true; autoSave(); });
   initPlazaDropdown();
   build();
 }
@@ -649,6 +658,7 @@ function initPlazaDropdown() {
       optionsEl.querySelectorAll(".custom-select-option").forEach(o => o.classList.remove("selected"));
       opt.classList.add("selected");
       container.classList.remove("open");
+      hasUnsavedChanges = true;
       autoSave();
     });
     optionsEl.appendChild(opt);
@@ -704,6 +714,7 @@ function toggle(id, el) {
   checked[id] = !checked[id];
   el.classList.toggle("done", checked[id]);
   updateTotal();
+  hasUnsavedChanges = true;
   autoSave();
 }
 
@@ -858,6 +869,7 @@ function autoSave() {
         await docRef.set(data);
       }
       isSaving = false;
+      hasUnsavedChanges = false;
       status.textContent = "Live sync";
       status.className = "auto-save-status live";
     } catch (err) {
