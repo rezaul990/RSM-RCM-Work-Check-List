@@ -830,8 +830,8 @@ function autoSave() {
         await docRef.set(data);
       }
       isSaving = false;
-      status.textContent = "Auto-saved";
-      status.className = "auto-save-status";
+      status.textContent = "Live sync";
+      status.className = "auto-save-status live";
     } catch (err) {
       isSaving = false;
       console.error("Auto-save error:", err);
