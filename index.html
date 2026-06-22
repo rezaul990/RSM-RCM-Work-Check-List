@@ -294,6 +294,15 @@
   }
   .auto-save-status.saving { color: var(--text-secondary); background: var(--bg); }
   .auto-save-status.error { color: var(--danger); background: var(--danger-bg); }
+  .auto-save-status.live::before {
+    content: ''; display: inline-block; width: 6px; height: 6px;
+    background: var(--success); border-radius: 50%; margin-right: 5px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
 
   /* ── Records Modal ── */
   .modal-backdrop {
@@ -558,6 +567,7 @@ const ITEMS = [
 ];
 
 let total = 0, checked = {}, editingDocId = null, saveTimer = null;
+let isSaving = false, activeUnsubscribe = null, currentDocKey = null;
 
 // ── Password Login ──
 function checkSession() {
@@ -712,6 +722,8 @@ function resetAll() {
   });
   Object.keys(checked).forEach(k => checked[k] = false);
   editingDocId = null;
+  currentDocKey = null;
+  unsubscribeListener();
   // Reset plaza dropdown
   document.getElementById("plaza-name").value = "";
   const trigger = document.getElementById("plaza-trigger");
@@ -719,6 +731,8 @@ function resetAll() {
   trigger.classList.add("placeholder");
   document.querySelectorAll("#plaza-options .custom-select-option").forEach(o => o.classList.remove("selected"));
   updateTotal();
+  document.getElementById("auto-save-status").textContent = "Auto-saved";
+  document.getElementById("auto-save-status").className = "auto-save-status";
 }
 
 function collectData() {
@@ -739,10 +753,64 @@ function collectData() {
   };
 }
 
+function getDocKey(plaza, date) {
+  return plaza.replace(/[^a-zA-Z0-9]/g, '_') + '__' + date;
+}
+
+function unsubscribeListener() {
+  if (activeUnsubscribe) { activeUnsubscribe(); activeUnsubscribe = null; }
+}
+
+function subscribeToDocument(docId) {
+  unsubscribeListener();
+  if (!docId) return;
+  const status = document.getElementById("auto-save-status");
+  status.textContent = "Live sync";
+  status.className = "auto-save-status live";
+  activeUnsubscribe = db.collection("checklists").doc(docId).onSnapshot(doc => {
+    if (isSaving || !doc.exists) return;
+    const data = doc.data();
+    if (data.items) {
+      data.items.forEach((item, idx) => {
+        const id = "item-" + idx;
+        checked[id] = !!item.checked;
+        const el = document.getElementById(id);
+        if (el) {
+          el.classList.toggle("done", checked[id]);
+          el.querySelector("textarea").value = item.remark || "";
+        }
+      });
+      updateTotal();
+    }
+    // Sync plaza and date fields (read-only from remote)
+    if (data.visitDate) document.getElementById("visit-date").value = data.visitDate;
+    if (data.plazaName) {
+      const plazaVal = data.plazaName;
+      document.getElementById("plaza-name").value = plazaVal;
+      const trigger = document.getElementById("plaza-trigger");
+      trigger.textContent = plazaVal;
+      trigger.classList.remove("placeholder");
+      document.querySelectorAll("#plaza-options .custom-select-option").forEach(opt => {
+        opt.classList.toggle("selected", opt.textContent === plazaVal);
+      });
+    }
+  });
+}
+
 function autoSave() {
   const plaza = document.getElementById("plaza-name").value;
   const date = document.getElementById("visit-date").value;
-  if (!plaza || !date) return; // Don't save without plaza and date
+  if (!plaza || !date) return;
+
+  const docKey = getDocKey(plaza, date);
+  const newDocId = "checklist_" + docKey;
+
+  // If plaza/date changed, switch to new document
+  if (docKey !== currentDocKey) {
+    currentDocKey = docKey;
+    editingDocId = newDocId;
+    subscribeToDocument(editingDocId);
+  }
 
   const status = document.getElementById("auto-save-status");
   status.textContent = "Saving...";
@@ -751,17 +819,21 @@ function autoSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try {
+      isSaving = true;
       const data = collectData();
-      if (editingDocId) {
-        await db.collection("checklists").doc(editingDocId).update(data);
+      const docRef = db.collection("checklists").doc(editingDocId);
+      const snap = await docRef.get();
+      if (snap.exists) {
+        await docRef.update(data);
       } else {
         data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-        const ref = await db.collection("checklists").add(data);
-        editingDocId = ref.id;
+        await docRef.set(data);
       }
+      isSaving = false;
       status.textContent = "Auto-saved";
       status.className = "auto-save-status";
     } catch (err) {
+      isSaving = false;
       console.error("Auto-save error:", err);
       status.textContent = "Save failed";
       status.className = "auto-save-status error";
@@ -774,7 +846,7 @@ async function openRecords() {
   const list = document.getElementById("records-list");
   list.innerHTML = '<div class="records-empty">Loading...</div>';
   try {
-    const snap = await db.collection("checklists").where("userId", "==", SHARED_USER_ID).orderBy("updatedAt", "desc").limit(50).get();
+    const snap = await db.collection("checklists").orderBy("updatedAt", "desc").limit(50).get();
     if (snap.empty) {
       list.innerHTML = '<div class="records-empty"><div class="records-empty-icon">📋</div>No saved records yet.<br>Fill out the checklist and check items to auto-save.</div>';
       return;
@@ -806,6 +878,7 @@ async function openRecords() {
 
 function loadRecord(docId, data) {
   editingDocId = docId;
+  currentDocKey = docId.replace("checklist_", "");
   document.getElementById("visit-date").value = data.visitDate || "";
   const plazaVal = data.plazaName || "";
   document.getElementById("plaza-name").value = plazaVal;
@@ -825,7 +898,8 @@ function loadRecord(docId, data) {
     });
   }
   updateTotal();
-  closeRecords(); showToast("Record loaded");
+  subscribeToDocument(editingDocId);
+  closeRecords(); showToast("Record loaded — live sync active");
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -834,7 +908,11 @@ async function deleteRecord(docId, cardEl) {
   try {
     await db.collection("checklists").doc(docId).delete();
     cardEl.remove();
-    if (editingDocId === docId) { editingDocId = null; }
+    if (editingDocId === docId) {
+      editingDocId = null;
+      currentDocKey = null;
+      unsubscribeListener();
+    }
     showToast("Record deleted");
     if (!document.getElementById("records-list").children.length)
       document.getElementById("records-list").innerHTML = '<div class="records-empty"><div class="records-empty-icon">📋</div>No saved records yet.</div>';
