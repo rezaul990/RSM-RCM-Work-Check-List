@@ -522,6 +522,7 @@
 
 <!-- ── Firebase SDK ── -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
@@ -534,9 +535,18 @@ const firebaseConfig = {
   appId: "1:13522888863:web:15f64663a848a1bc419aaa"
 };
 firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
 const db = firebase.firestore();
 const APP_PASSWORD = "123456";
 const SHARED_USER_ID = "shared-user";
+
+// Silent anonymous auth — required for Firestore security rules
+auth.onAuthStateChanged(user => {
+  if (user) { authReady = true; }
+});
+auth.signInAnonymously().catch(err => {
+  console.error("Anonymous auth failed:", err.message);
+});
 
 const ITEMS = [
   { section: "General Operations / সাধারণ অপারেশন", items: [
@@ -569,6 +579,7 @@ const ITEMS = [
 let total = 0, checked = {}, editingDocId = null, saveTimer = null;
 let isSaving = false, isLoadingDoc = false, activeUnsubscribe = null, currentDocKey = null;
 let hasUnsavedChanges = false;
+let authReady = false;
 
 // Warn user if they try to leave with unsaved changes
 window.addEventListener("beforeunload", function(e) {
@@ -775,6 +786,11 @@ function unsubscribeListener() {
 function subscribeToDocument(docId) {
   unsubscribeListener();
   if (!docId) return;
+  // Wait for auth before subscribing
+  if (!authReady) {
+    setTimeout(() => subscribeToDocument(docId), 500);
+    return;
+  }
   isLoadingDoc = true;
   const status = document.getElementById("auto-save-status");
   status.textContent = "Loading...";
@@ -840,6 +856,12 @@ function autoSave() {
   const plaza = document.getElementById("plaza-name").value;
   const date = document.getElementById("visit-date").value;
   if (!plaza || !date) return;
+
+  // Wait for anonymous auth to complete before saving
+  if (!authReady) {
+    setTimeout(() => autoSave(), 500);
+    return;
+  }
 
   const docKey = getDocKey(plaza, date);
   const newDocId = "checklist_" + docKey;
