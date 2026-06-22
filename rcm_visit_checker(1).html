@@ -55,20 +55,33 @@
   }
   .login-logo { font-size: 24px; font-weight: 800; color: white; letter-spacing: -0.3px; }
   .login-logo-sub { font-size: 13px; color: rgba(255,255,255,0.75); margin-top: 6px; line-height: 1.4; font-family: 'Hind Siliguri', 'Noto Sans Bengali', sans-serif; }
-  .btn-google {
-    display: flex; align-items: center; justify-content: center; gap: 12px;
-    background: white; border: none;
-    padding: 14px 32px; border-radius: 14px;
-    font-size: 15px; font-weight: 700; color: var(--text);
-    cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
-    width: 100%; max-width: 300px;
-    font-family: inherit;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  .login-password-wrap {
+    display: flex; flex-direction: column; gap: 12px; align-items: center;
+    width: 100%; max-width: 280px; margin: 0 auto;
   }
-  .btn-google:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,0,0,0.2); }
-  .btn-google:active { transform: translateY(0); }
-  .btn-google svg { width: 22px; height: 22px; flex-shrink: 0; }
-  .login-loading { font-size: 13px; color: rgba(255,255,255,0.8); }
+  .login-password-input {
+    width: 100%; padding: 14px 18px; border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 14px; font-size: 16px; color: white;
+    background: rgba(255,255,255,0.12); font-family: inherit; font-weight: 600;
+    text-align: center; letter-spacing: 4px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .login-password-input::placeholder { color: rgba(255,255,255,0.5); letter-spacing: 1px; }
+  .login-password-input:focus {
+    outline: none; border-color: rgba(255,255,255,0.6);
+    background: rgba(255,255,255,0.18);
+  }
+  .btn-login {
+    width: 100%; padding: 14px 32px; border-radius: 14px;
+    background: white; border: none;
+    font-size: 15px; font-weight: 700; color: var(--primary-dark);
+    cursor: pointer; font-family: inherit;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .btn-login:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,0,0,0.2); }
+  .btn-login:active { transform: translateY(0); }
+  .login-error { font-size: 12px; color: #fca5a5; display: none; }
   .login-footer { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 8px; }
 
   /* ── Header ── */
@@ -273,6 +286,14 @@
     transition: all 0.15s;
   }
   .btn-export:hover { background: #1e293b; }
+  .auto-save-status {
+    font-size: 11px; font-weight: 600; color: var(--success);
+    padding: 6px 12px; border-radius: 8px;
+    background: #ecfdf5; white-space: nowrap;
+    transition: all 0.3s;
+  }
+  .auto-save-status.saving { color: var(--text-secondary); background: var(--bg); }
+  .auto-save-status.error { color: var(--danger); background: var(--danger-bg); }
 
   /* ── Records Modal ── */
   .modal-backdrop {
@@ -386,7 +407,7 @@
     }
     .bottom-count { width: 100%; text-align: center; font-size: 12px; order: -1; }
     .btn-reset { order: 1; }
-    .btn-save { order: 2; margin-left: 0; flex: 1; }
+    .auto-save-status { order: 2; }
     .btn-export { order: 3; }
     .modal-sheet { max-height: 88vh; border-radius: 20px 20px 0 0; }
     .login-card { padding: 36px 24px; margin: 0 8px; }
@@ -419,12 +440,12 @@
     </div>
     <div class="login-logo">RCM Visit Checker</div>
     <div class="login-logo-sub">আঞ্চলিক ক্রেডিট ম্যানেজার পরিদর্শন চেকলিস্ট</div>
+    <div class="login-password-wrap">
+      <input type="password" class="login-password-input" id="login-password" placeholder="Enter Password" autocomplete="off" onkeydown="if(event.key==='Enter')passwordLogin()">
+      <button class="btn-login" onclick="passwordLogin()">Login</button>
+      <div class="login-error" id="login-error">Wrong password. Try again.</div>
+    </div>
   </div>
-  <button class="btn-google" id="btn-google-login" onclick="signInWithGoogle()">
-    <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-    Sign in with Google
-  </button>
-  <div class="login-loading" id="login-loading" style="display:none">Signing in...</div>
   <div class="login-footer">Walton RCM Dashboard</div>
 </div>
 
@@ -439,8 +460,7 @@
   <div class="header-right">
     <button class="btn-header" onclick="openRecords()">Records</button>
     <button class="btn-header solid" onclick="window.print()">Print</button>
-    <img class="user-avatar" id="user-avatar" src="" alt="" style="display:none">
-    <button class="btn-header" onclick="signOutUser()">Logout</button>
+    <button class="btn-header" onclick="logoutUser()">Logout</button>
   </div>
 </div>
 
@@ -471,7 +491,7 @@
 <div class="bottom-bar">
   <div class="bottom-count"><span id="done-count">0</span> / 21 checked</div>
   <button class="btn-reset" onclick="resetAll()">Reset</button>
-  <button class="btn-save" id="btn-save" onclick="saveChecklist()">Save</button>
+  <div class="auto-save-status" id="auto-save-status">Auto-saved</div>
   <button class="btn-export" onclick="window.print()">Export PDF</button>
 </div>
 
@@ -493,7 +513,6 @@
 
 <!-- ── Firebase SDK ── -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
@@ -506,8 +525,9 @@ const firebaseConfig = {
   appId: "1:13522888863:web:15f64663a848a1bc419aaa"
 };
 firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
 const db = firebase.firestore();
+const APP_PASSWORD = "123456";
+const SHARED_USER_ID = "shared-user";
 
 const ITEMS = [
   { section: "General Operations / সাধারণ অপারেশন", items: [
@@ -537,35 +557,41 @@ const ITEMS = [
   ]},
 ];
 
-let total = 0, checked = {}, currentUser = null, editingDocId = null;
+let total = 0, checked = {}, editingDocId = null, saveTimer = null;
 
-auth.onAuthStateChanged(user => {
-  if (user) {
-    currentUser = user;
+// ── Password Login ──
+function checkSession() {
+  if (localStorage.getItem("rcm_logged_in") === "true") {
     document.getElementById("login-overlay").classList.add("hidden");
     document.getElementById("main-app").style.display = "";
-    const av = document.getElementById("user-avatar");
-    if (user.photoURL) { av.src = user.photoURL; av.style.display = ""; }
     initApp();
-  } else {
-    currentUser = null;
-    document.getElementById("login-overlay").classList.remove("hidden");
-    document.getElementById("main-app").style.display = "none";
   }
-});
-
-function signInWithGoogle() {
-  const btn = document.getElementById("btn-google-login");
-  const loading = document.getElementById("login-loading");
-  btn.style.display = "none"; loading.style.display = "";
-  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => {
-    console.error("Sign-in error:", err);
-    btn.style.display = ""; loading.style.display = "none";
-    showToast("Sign-in failed: " + err.message);
-  });
 }
 
-function signOutUser() { if (confirm("Sign out?")) auth.signOut(); }
+function passwordLogin() {
+  const pw = document.getElementById("login-password").value;
+  if (pw === APP_PASSWORD) {
+    localStorage.setItem("rcm_logged_in", "true");
+    document.getElementById("login-overlay").classList.add("hidden");
+    document.getElementById("main-app").style.display = "";
+    document.getElementById("login-password").value = "";
+    document.getElementById("login-error").style.display = "none";
+    initApp();
+  } else {
+    document.getElementById("login-error").style.display = "block";
+    document.getElementById("login-password").value = "";
+    document.getElementById("login-password").focus();
+  }
+}
+
+function logoutUser() {
+  if (!confirm("Logout?")) return;
+  localStorage.removeItem("rcm_logged_in");
+  document.getElementById("login-overlay").classList.remove("hidden");
+  document.getElementById("main-app").style.display = "none";
+}
+
+checkSession();
 
 const PLAZAS = [
   "Walton Plaza-Adalot Road, Tangail",
@@ -589,6 +615,7 @@ const PLAZAS = [
 
 function initApp() {
   document.getElementById("visit-date").value = new Date().toISOString().split("T")[0];
+  document.getElementById("visit-date").addEventListener("change", () => autoSave());
   initPlazaDropdown();
   build();
 }
@@ -612,6 +639,7 @@ function initPlazaDropdown() {
       optionsEl.querySelectorAll(".custom-select-option").forEach(o => o.classList.remove("selected"));
       opt.classList.add("selected");
       container.classList.remove("open");
+      autoSave();
     });
     optionsEl.appendChild(opt);
   });
@@ -666,6 +694,7 @@ function toggle(id, el) {
   checked[id] = !checked[id];
   el.classList.toggle("done", checked[id]);
   updateTotal();
+  autoSave();
 }
 
 function updateTotal() {
@@ -690,7 +719,6 @@ function resetAll() {
   trigger.classList.add("placeholder");
   document.querySelectorAll("#plaza-options .custom-select-option").forEach(o => o.classList.remove("selected"));
   updateTotal();
-  document.getElementById("btn-save").textContent = "Save";
 }
 
 function collectData() {
@@ -703,7 +731,7 @@ function collectData() {
     });
   });
   return {
-    userId: currentUser.uid, userName: currentUser.displayName || "",
+    userId: SHARED_USER_ID,
     visitDate: document.getElementById("visit-date").value,
     plazaName: document.getElementById("plaza-name").value,
     items, totalItems: total, completedItems: Object.values(checked).filter(Boolean).length,
@@ -711,32 +739,34 @@ function collectData() {
   };
 }
 
-async function saveChecklist() {
-  if (!currentUser) return;
+function autoSave() {
   const plaza = document.getElementById("plaza-name").value;
   const date = document.getElementById("visit-date").value;
-  if (!plaza) { showToast("Please select a plaza"); return; }
-  if (!date) { showToast("Please select a date"); return; }
-  const btn = document.getElementById("btn-save");
-  btn.disabled = true; btn.textContent = "Saving...";
-  try {
-    const data = collectData();
-    if (editingDocId) {
-      await db.collection("checklists").doc(editingDocId).update(data);
-      showToast("Updated successfully!");
-    } else {
-      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-      const ref = await db.collection("checklists").add(data);
-      editingDocId = ref.id;
-      showToast("Saved successfully!");
+  if (!plaza || !date) return; // Don't save without plaza and date
+
+  const status = document.getElementById("auto-save-status");
+  status.textContent = "Saving...";
+  status.className = "auto-save-status saving";
+
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      const data = collectData();
+      if (editingDocId) {
+        await db.collection("checklists").doc(editingDocId).update(data);
+      } else {
+        data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        const ref = await db.collection("checklists").add(data);
+        editingDocId = ref.id;
+      }
+      status.textContent = "Auto-saved";
+      status.className = "auto-save-status";
+    } catch (err) {
+      console.error("Auto-save error:", err);
+      status.textContent = "Save failed";
+      status.className = "auto-save-status error";
     }
-    btn.textContent = "Update";
-  } catch (err) {
-    console.error("Save error:", err);
-    showToast("Save failed: " + err.message);
-    btn.textContent = editingDocId ? "Update" : "Save";
-  }
-  btn.disabled = false;
+  }, 600);
 }
 
 async function openRecords() {
@@ -744,9 +774,9 @@ async function openRecords() {
   const list = document.getElementById("records-list");
   list.innerHTML = '<div class="records-empty">Loading...</div>';
   try {
-    const snap = await db.collection("checklists").where("userId", "==", currentUser.uid).orderBy("updatedAt", "desc").limit(50).get();
+    const snap = await db.collection("checklists").where("userId", "==", SHARED_USER_ID).orderBy("updatedAt", "desc").limit(50).get();
     if (snap.empty) {
-      list.innerHTML = '<div class="records-empty"><div class="records-empty-icon">📋</div>No saved records yet.<br>Fill out the checklist and tap Save.</div>';
+      list.innerHTML = '<div class="records-empty"><div class="records-empty-icon">📋</div>No saved records yet.<br>Fill out the checklist and check items to auto-save.</div>';
       return;
     }
     list.innerHTML = "";
@@ -795,7 +825,6 @@ function loadRecord(docId, data) {
     });
   }
   updateTotal();
-  document.getElementById("btn-save").textContent = "Update";
   closeRecords(); showToast("Record loaded");
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -805,7 +834,7 @@ async function deleteRecord(docId, cardEl) {
   try {
     await db.collection("checklists").doc(docId).delete();
     cardEl.remove();
-    if (editingDocId === docId) { editingDocId = null; document.getElementById("btn-save").textContent = "Save"; }
+    if (editingDocId === docId) { editingDocId = null; }
     showToast("Record deleted");
     if (!document.getElementById("records-list").children.length)
       document.getElementById("records-list").innerHTML = '<div class="records-empty"><div class="records-empty-icon">📋</div>No saved records yet.</div>';
