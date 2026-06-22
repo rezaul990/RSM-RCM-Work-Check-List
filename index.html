@@ -591,8 +591,6 @@ function logoutUser() {
   document.getElementById("main-app").style.display = "none";
 }
 
-checkSession();
-
 const PLAZAS = [
   "Walton Plaza-Adalot Road, Tangail",
   "Walton Plaza-Bashtoil, Mirzapur",
@@ -612,6 +610,8 @@ const PLAZAS = [
   "Walton Plaza-Sohagpur, Mirzapur",
   "Walton Plaza-Zilla Sadar Road, Tangail"
 ];
+
+checkSession();
 
 function initApp() {
   document.getElementById("visit-date").value = new Date().toISOString().split("T")[0];
