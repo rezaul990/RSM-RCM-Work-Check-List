@@ -645,7 +645,7 @@ checkSession();
 
 function initApp() {
   document.getElementById("visit-date").value = new Date().toISOString().split("T")[0];
-  document.getElementById("visit-date").addEventListener("change", () => { hasUnsavedChanges = true; autoSave(); });
+  document.getElementById("visit-date").addEventListener("change", () => { switchDocument(); });
   initPlazaDropdown();
   build();
 }
@@ -669,8 +669,7 @@ function initPlazaDropdown() {
       optionsEl.querySelectorAll(".custom-select-option").forEach(o => o.classList.remove("selected"));
       opt.classList.add("selected");
       container.classList.remove("open");
-      hasUnsavedChanges = true;
-      autoSave();
+      switchDocument();
     });
     optionsEl.appendChild(opt);
   });
@@ -850,6 +849,30 @@ function subscribeToDocument(docId) {
     status.textContent = "Live sync";
     status.className = "auto-save-status live";
   });
+}
+
+// Called when plaza or date changes — LOAD only, never overwrite
+function switchDocument() {
+  const plaza = document.getElementById("plaza-name").value;
+  const date = document.getElementById("visit-date").value;
+  if (!plaza || !date) return;
+  if (!authReady) { setTimeout(() => switchDocument(), 500); return; }
+
+  const docKey = getDocKey(plaza, date);
+  const newDocId = "checklist_" + docKey;
+
+  // Reset local state before loading
+  document.querySelectorAll(".check-item").forEach(el => {
+    el.classList.remove("done");
+    el.querySelector("textarea").value = "";
+  });
+  Object.keys(checked).forEach(k => checked[k] = false);
+  updateTotal();
+
+  currentDocKey = docKey;
+  editingDocId = newDocId;
+  hasUnsavedChanges = false;
+  subscribeToDocument(editingDocId);
 }
 
 function autoSave() {
